@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: clipper-api
+    runtime: docker
+    rootDir: backend
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: JOB_ROOT
+        value: /tmp/jobs
