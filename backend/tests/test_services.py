@@ -80,12 +80,15 @@ def test_manual_captions_preferred(monkeypatch):
 
 def test_section_fallback_stays_bounded(tmp_path, monkeypatch):
     from app.services import download_service as service
+    monkeypatch.setattr(service, 'check_source_provider', lambda: None)
     monkeypatch.setattr(service.shutil, 'which', lambda _: 'tool')
     attempts = []
     class FakeYDL:
         def __init__(self, opts): self.opts = opts
         def __enter__(self): return self
         def __exit__(self, *args): pass
+        def extract_info(self, *args, **kwargs): return {'id': 'test'}
+        def process_ie_result(self, *args, **kwargs): return self.download([])
         def download(self, urls):
             attempts.append(dict(self.opts))
             (tmp_path / 'source.mp4').write_bytes(b'source')
@@ -100,16 +103,19 @@ def test_section_fallback_stays_bounded(tmp_path, monkeypatch):
     assert list(attempts[1]['download_ranges']({}, None)) == [{'start_time':5, 'end_time':10}]
     args = attempts[1]['external_downloader_args']['ffmpeg_o']
     assert args == ['-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
-                    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k']
+                    '-pix_fmt', 'yuv420p', '-fps_mode', 'passthrough', '-c:a', 'aac', '-b:a', '192k']
 
 def test_good_section_avoids_reencoding(tmp_path, monkeypatch):
     from app.services import download_service as service
+    monkeypatch.setattr(service, 'check_source_provider', lambda: None)
     monkeypatch.setattr(service.shutil, 'which', lambda _: 'tool')
     attempts = []
     class FakeYDL:
         def __init__(self, opts): attempts.append(dict(opts))
         def __enter__(self): return self
         def __exit__(self, *args): pass
+        def extract_info(self, *args, **kwargs): return {'id': 'test'}
+        def process_ie_result(self, *args, **kwargs): return self.download([])
         def download(self, urls): (tmp_path / 'source.mp4').write_bytes(b'source')
     monkeypatch.setattr(service, 'YoutubeDL', FakeYDL)
     monkeypatch.setattr(service, 'editor_mp4', lambda source, output, update, **kwargs: output.write_bytes(b'mp4'))
