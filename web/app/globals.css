@@ -204,6 +204,7 @@ footer span span { padding: 0 7px; color: #565962; }
 .preview-capture { display: flex; gap: 6px; }
 .preview-capture button, .seek-button { background: var(--raised); color: var(--text); border: 1px solid #383a40; border-radius: 3px; padding: 6px 11px; font-size: 12px; }
 .preview-capture button:hover:not(:disabled), .seek-button:hover:not(:disabled) { background: #2d2f34; border-color: var(--accent); }
+.preview-capture button[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: var(--accent-surface); }
 .preview-shortcuts { color: var(--muted); font-size: 11px; }
 .preview-shortcuts kbd { font: 11px var(--mono); color: var(--text); border: 1px solid var(--border); border-radius: 2px; padding: 1px 4px; margin-left: 8px; }
 .preview-status { color: var(--muted); font-size: 12px; margin: 9px 0; }

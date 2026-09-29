@@ -7,18 +7,54 @@ type Props = {
   videoId: string;
   active: boolean;
   duration: number;
+  startSeconds: number;
+  endSeconds: number;
+  rangeValid: boolean;
   seekRequest: { seconds: number } | null;
   onSetIn(seconds: number): void;
   onSetOut(seconds: number): void;
   onAvailable(available: boolean): void;
 };
 
-export default function SourcePreview({ videoId, active, duration, seekRequest, onSetIn, onSetOut, onAvailable }: Props) {
+export default function SourcePreview({ videoId, active, duration, startSeconds, endSeconds, rangeValid, seekRequest, onSetIn, onSetOut, onAvailable }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const player = useRef<YouTubePlayer | null>(null);
   const [enabled, setEnabled] = useState(active);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [previewing, setPreviewing] = useState(false);
+  const [loop, setLoop] = useState(false);
+  const loopRef = useRef(loop);
+  useEffect(() => { loopRef.current = loop; }, [loop]);
+  // Range edits and external seeks exit preview mode; IN/OUT remain owned by the form.
+  useEffect(() => { setPreviewing(false); }, [startSeconds, endSeconds, active, ready, seekRequest]);
+  useEffect(() => {
+    if (!previewing || !active || !ready || !rangeValid || !player.current) return;
+    const target = player.current;
+    let awaitingSeek = true;
+    target.seekTo(startSeconds, true);
+    target.playVideo();
+    const timer = window.setInterval(() => {
+      const seconds = target.getCurrentTime();
+      const state = target.getPlayerState();
+      // seekTo is asynchronous: don't mistake the previous position for OUT.
+      if (awaitingSeek) {
+        if (seconds >= startSeconds && seconds < endSeconds && state === 1) awaitingSeek = false;
+        else return;
+      }
+      if ((state === 1 && seconds >= endSeconds) || state === 0) {
+        if (loopRef.current) {
+          awaitingSeek = true;
+          target.seekTo(startSeconds, true);
+          target.playVideo();
+        } else {
+          target.pauseVideo();
+          setPreviewing(false);
+        }
+      }
+    }, 50);
+    return () => { window.clearInterval(timer); target.pauseVideo(); };
+  }, [previewing, active, ready, rangeValid, startSeconds, endSeconds]);
   const activeRef = useRef(active);
   // Keep callbacks and timecode changes out of the player's creation lifecycle.
   const callbacks = useRef({ onSetIn, onSetOut, onAvailable });
@@ -106,6 +142,9 @@ export default function SourcePreview({ videoId, active, duration, seekRequest, 
     <div className="preview-frame"><div ref={host} className="preview-host" /></div>
     {!ready && !error && <p className="preview-status" role="status">Loading YouTube preview…</p>}
     {error && <p className="preview-status" role="status">{error} <a href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noreferrer">Open on YouTube</a></p>}
+    <div className="preview-toolbar">
+      <div className="preview-capture"><button disabled={!ready || !active || !rangeValid} onClick={() => setPreviewing(value => !value)}>{previewing ? 'Stop Preview' : 'Preview Clip'}</button><button aria-pressed={loop} onClick={() => setLoop(value => !value)}>Loop {loop ? 'on' : 'off'}</button></div>
+    </div>
     <div className="preview-toolbar">
       <div className="preview-capture"><button disabled={!ready} onClick={() => capture('in')}>Set IN</button><button disabled={!ready} onClick={() => capture('out')}>Set OUT</button></div>
       <span className="preview-shortcuts" title="Shortcuts work while Clip is active, outside text fields and the YouTube iframe."><kbd>I</kbd> Set IN <kbd>O</kbd> Set OUT</span>
