@@ -10,7 +10,7 @@ type Props = {
   startSeconds: number;
   endSeconds: number;
   rangeValid: boolean;
-  seekRequest: { seconds: number } | null;
+  seekRequest: { seconds: number; preview?: boolean } | null;
   onSetIn(seconds: number): void;
   onSetOut(seconds: number): void;
   onAvailable(available: boolean): void;
@@ -109,6 +109,7 @@ export default function SourcePreview({ videoId, active, duration, startSeconds,
   useEffect(() => {
     if (ready && seekRequest && Number.isFinite(seekRequest.seconds)) {
       player.current?.seekTo(Math.max(0, Math.min(duration, seekRequest.seconds)), true);
+      if (seekRequest.preview) setPreviewing(true);
     }
   }, [seekRequest, ready, duration]);
 

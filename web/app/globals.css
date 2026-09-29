@@ -209,6 +209,19 @@ footer span span { padding: 0 7px; color: #565962; }
 .preview-shortcuts kbd { font: 11px var(--mono); color: var(--text); border: 1px solid var(--border); border-radius: 2px; padding: 1px 4px; margin-left: 8px; }
 .preview-status { color: var(--muted); font-size: 12px; margin: 9px 0; }
 .preview-status a { color: var(--accent); text-decoration: underline; }
+.clip-list { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 18px; }
+.clip-list-heading { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+.clip-list-heading h2 { margin: 0; font-size: 14px; }
+.clip-list-heading h2 span { color: var(--muted); margin-left: 6px; }
+.clip-list-heading p { color: var(--muted); font-size: 12px; margin: 4px 0; }
+.clip-list .preview-capture { flex-wrap: wrap; }
+.saved-clip { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.saved-clip-editing { border-bottom-color: var(--accent); }
+.saved-clip input { flex: 1 1 150px; width: 150px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 3px; padding: 7px 9px; font-size: 13px; }
+.saved-clip-time { font: 12px var(--mono); }
+.saved-clip-time small { display: block; color: var(--muted); margin-top: 5px; font-size: 10px; }
+.saved-clip-result { flex-basis: 100%; color: var(--muted); font-size: 12px; }
+.saved-clip-result button { margin-left: 12px; }
 .clip-controls .time-grid { grid-template-columns: 1fr; gap: 12px; }
 .clip-controls .time-field { padding: 12px; }
 .clip-controls .time-field input { font-size: 26px; }
