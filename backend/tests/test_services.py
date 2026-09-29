@@ -90,7 +90,7 @@ def test_section_fallback_stays_bounded(tmp_path, monkeypatch):
             attempts.append(dict(self.opts))
             (tmp_path / 'source.mp4').write_bytes(b'source')
     monkeypatch.setattr(service, 'YoutubeDL', FakeYDL)
-    monkeypatch.setattr(service, 'editor_mp4', lambda source, output, update: output.write_bytes(b'mp4'))
+    monkeypatch.setattr(service, 'editor_mp4', lambda source, output, update, **kwargs: output.write_bytes(b'mp4'))
     monkeypatch.setattr(service, 'usable_section', lambda path, duration: len(attempts) == 2)
     result = service.process(URL, '1080', tmp_path, lambda *args: None, section=(5, 10))
     assert result.exists() and len(attempts) == 2
@@ -98,6 +98,9 @@ def test_section_fallback_stays_bounded(tmp_path, monkeypatch):
     assert attempts[1]['force_keyframes_at_cuts'] is True
     assert attempts[0]['download_ranges'] is attempts[1]['download_ranges']
     assert list(attempts[1]['download_ranges']({}, None)) == [{'start_time':5, 'end_time':10}]
+    args = attempts[1]['external_downloader_args']['ffmpeg_o']
+    assert args == ['-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
+                    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k']
 
 def test_good_section_avoids_reencoding(tmp_path, monkeypatch):
     from app.services import download_service as service
@@ -109,7 +112,7 @@ def test_good_section_avoids_reencoding(tmp_path, monkeypatch):
         def __exit__(self, *args): pass
         def download(self, urls): (tmp_path / 'source.mp4').write_bytes(b'source')
     monkeypatch.setattr(service, 'YoutubeDL', FakeYDL)
-    monkeypatch.setattr(service, 'editor_mp4', lambda source, output, update: output.write_bytes(b'mp4'))
+    monkeypatch.setattr(service, 'editor_mp4', lambda source, output, update, **kwargs: output.write_bytes(b'mp4'))
     monkeypatch.setattr(service, 'usable_section', lambda *args: True)
     service.process(URL, '720', tmp_path, lambda *args: None, section=(0, 5))
     assert len(attempts) == 1 and attempts[0]['force_keyframes_at_cuts'] is False

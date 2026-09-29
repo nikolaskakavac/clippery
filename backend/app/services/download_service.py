@@ -7,6 +7,9 @@ from yt_dlp.utils import download_range_func
 from app.config import MAX_RESOLUTION
 from app.services.video_service import options, ServiceError
 
+# Used for accurate section cuts and any clip codec conversion. Never scale up.
+CLIP_VIDEO_ARGS = ['-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p']
+
 def format_selector(quality: str) -> str:
     height = min(int(quality) if quality != 'best' else MAX_RESOLUTION, MAX_RESOLUTION)
     return f'bv[height<={height}]+ba/b[height<={height}]'
@@ -16,7 +19,7 @@ def probe(path: Path) -> dict:
                             capture_output=True, text=True, timeout=30, check=True)
     return json.loads(result.stdout)
 
-def editor_mp4(source: Path, output: Path, update) -> None:
+def editor_mp4(source: Path, output: Path, update, *, clip=False) -> None:
     update('Merging', 95)
     streams = probe(source)['streams']
     video = next((s for s in streams if s['codec_type'] == 'video'), {})
@@ -25,9 +28,12 @@ def editor_mp4(source: Path, output: Path, update) -> None:
     args = ['ffmpeg', '-nostdin', '-y', '-i', str(source), '-map', '0:v:0', '-map', '0:a:0?',
             '-c:v', 'copy' if copy_video else 'libx264']
     if not copy_video:
-        args += ['-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p']
-    args += ['-c:a', 'copy' if audio.get('codec_name') == 'aac' else 'aac',
-             '-movflags', '+faststart', '-avoid_negative_ts', 'make_zero', str(output)]
+        args += CLIP_VIDEO_ARGS if clip else ['-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p']
+    copy_audio = audio.get('codec_name') == 'aac'
+    args += ['-c:a', 'copy' if copy_audio else 'aac']
+    if clip and not copy_audio:
+        args += ['-b:a', '192k']
+    args += ['-movflags', '+faststart', '-avoid_negative_ts', 'make_zero', str(output)]
     subprocess.run(args, capture_output=True, timeout=3600, check=True)
 
 def usable_section(path: Path, duration: float) -> bool:
@@ -61,15 +67,15 @@ def process(url: str, quality: str, directory: Path, update, section=None) -> Pa
             # Retry only the bounded section, never the full source. Precise cuts need
             # re-encoding when the requested start is not a usable keyframe boundary.
             opts['force_keyframes_at_cuts'] = True
-            opts['external_downloader_args'] = {'ffmpeg_o': ['-c:v', 'libx264', '-preset', 'veryfast',
-                '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac']}
+            opts['external_downloader_args'] = {'ffmpeg_o': [
+                '-c:v', 'libx264', *CLIP_VIDEO_ARGS, '-c:a', 'aac', '-b:a', '192k']}
         with YoutubeDL(opts) as ydl:
             ydl.download([url])
         sources = [p for p in directory.glob('source.*') if p.suffix in {'.mp4', '.mkv', '.webm'}]
         if len(sources) != 1:
             raise ServiceError('Video processing did not produce a usable file.')
         output = directory / 'clipper.mp4'
-        editor_mp4(sources[0], output, update)
+        editor_mp4(sources[0], output, update, clip=section is not None)
         sources[0].unlink(missing_ok=True)
         if not section or usable_section(output, section[1] - section[0]):
             return output
