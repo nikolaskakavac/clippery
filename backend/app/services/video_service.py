@@ -1,13 +1,24 @@
+import logging
+from pathlib import Path
+
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
 from app.utils.validation import normalize_url
 from app.utils.time import format_time
 
+logger = logging.getLogger(__name__)
+BGUTIL_SERVER_HOME = Path(__file__).resolve().parents[2] / 'vendor' / 'bgutil-ytdlp-pot-provider' / 'server'
+
 class ServiceError(Exception):
     pass
 
 def options() -> dict:
-    return {'quiet': True, 'no_warnings': True, 'noplaylist': True,
+    return {'quiet': True, 'no_warnings': False, 'noplaylist': True,
+            'logger': logger,
+            'extractor_args': {
+                'youtube': {'player_client': ['mweb']},
+                'youtubepot-bgutilscript': {'server_home': [str(BGUTIL_SERVER_HOME)]},
+            },
             'socket_timeout': 25, 'retries': 2, 'extractor_retries': 2,
             'js_runtimes': {'node': {}}, 'geo_bypass': False, 'cachedir': False, 'ignoreconfig': True}
 
@@ -21,7 +32,8 @@ def extract(url: str) -> dict:
         if info.get('availability') in {'private', 'premium_only', 'subscriber_only', 'needs_auth'}:
             raise ServiceError('This video is restricted or requires authentication.')
         return info
-    except DownloadError:
+    except DownloadError as exc:
+        logger.error('YouTube extraction failed: %s', exc)
         raise ServiceError('YouTube could not provide this video. It may be unavailable, restricted, or temporarily blocked. Try again later or use another public video.') from None
 
 def metadata(url: str) -> dict:

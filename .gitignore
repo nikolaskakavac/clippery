@@ -9,3 +9,4 @@ tmp/
 *.tsbuildinfo
 .npm-cache/
 .tools/
+backend/vendor/bgutil-ytdlp-pot-provider/
