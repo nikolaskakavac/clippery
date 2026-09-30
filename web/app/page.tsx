@@ -3,7 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import SourcePreview from '@/components/source-preview';
 import ClipList from '@/components/clip-list';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { parseSession, SESSION_KEY } from '@/lib/session';
 import { ArrowDownToLine, ArrowRight, Check, ChevronLeft, ChevronRight, Clock3, Copy, FileText, Film, Link2, Loader2, Scissors, Search, Youtube } from 'lucide-react';
 import { API, api, ApiError, editTime, exportTranscript, Job, parseTime, Transcript, Video } from '@/lib/api';
 type Tab = 'download' | 'clip' | 'transcript';
@@ -16,6 +17,8 @@ function Highlight({ text, query }: { text: string; query: string }) {
   parts.push(text.slice(cursor)); return <>{parts}</>;
 }
 export default function Home() {
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionNotice, setSessionNotice] = useState('');
   const [url, setUrl] = useState(''); const [video, setVideo] = useState<Video | null>(null); const [tab, setTab] = useState<Tab>('download');
   const [analyzing, setAnalyzing] = useState(false); const [error, setError] = useState(''); const [quality, setQuality] = useState('1080');
   const [previewSeek, setPreviewSeek] = useState<{ seconds: number; preview?: boolean } | null>(null);
@@ -33,6 +36,23 @@ export default function Home() {
   const matches = useMemo(() => transcript?.segments.map((s, index) => ({ ...s, index })).filter(s => s.text.toLowerCase().includes(deferredQuery.toLowerCase())) || [], [transcript, deferredQuery]);
   const totalPages = Math.max(1, Math.ceil(matches.length / 80)); const currentPage = Math.min(page, totalPages - 1);
   useEffect(() => {
+    try {
+      const saved = parseSession(localStorage.getItem(SESSION_KEY));
+      if (saved) {
+        setUrl(saved.url); setVideo(saved.video); setStart(saved.start); setEnd(saved.end);
+        setTab(saved.tab); setQuality(saved.quality);
+      }
+    } catch { setSessionNotice('Session storage is unavailable. Keep this page open to retain your workspace.'); }
+    setSessionReady(true);
+  }, []);
+  useEffect(() => {
+    // Do not overwrite a saved session with the initial empty render.
+    if (!sessionReady) return;
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ version: 1, url, video, start, end, tab, quality }));
+    } catch { setSessionNotice('Could not save this session locally. Keep this page open to retain your workspace.'); }
+  }, [sessionReady, url, video, start, end, tab, quality]);
+  useEffect(() => {
     if (!job || ['Ready', 'Failed'].includes(job.state)) return;
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     const poll = async () => { try { const updated = await api<Job>(`/jobs/${job.id}`, undefined, controller.signal); setJob(updated); setPollError(''); if (!['Ready', 'Failed'].includes(updated.state)) timer = setTimeout(poll, 1200); } catch (e) { if (!controller.signal.aborted) { if (e instanceof ApiError && e.status === 404) { setJob({ ...job, state: 'Failed', error: e.message }); } else { setPollError(message(e)); timer = setTimeout(poll, 4000); } } } };
@@ -43,14 +63,17 @@ export default function Home() {
     try { const result = await api<Video>('/info', { url }); if (current !== generation.current) return; setVideo(result); setPreviewSeek(null); setTranscript(null); setTranscriptError(''); setTranscriptLoading(false); setSelection(null); setQuery(''); setPage(0); setJob(null); setPollError(''); setStart('00:00:00'); setEnd(editTime(Math.min(30, result.duration))); setTab('download'); }
     catch (e) { setError(message(e)); } finally { setAnalyzing(false); }
   }
-  async function loadTranscript() {
+  const loadTranscript = useCallback(async () => {
     if (!video || transcriptLoading) return; const current = generation.current; const controller = new AbortController(); captionController.current = controller;
     setTranscriptLoading(true); setTranscriptError('');
     try { const result = await api<Transcript>('/transcript', { url: video.webpageUrl }, controller.signal); if (current === generation.current) setTranscript(result); }
     catch (e) { if (!controller.signal.aborted && current === generation.current) setTranscriptError(message(e)); }
     finally { if (current === generation.current) setTranscriptLoading(false); }
-  }
-  function changeTab(next: Tab) { setTab(next); if (next === 'transcript' && !transcript && !transcriptLoading) void loadTranscript(); }
+  }, [video, transcriptLoading]);
+  useEffect(() => {
+    if (sessionReady && !analyzing && tab === 'transcript' && video && !transcript && !transcriptLoading && !transcriptError) void loadTranscript();
+  }, [sessionReady, analyzing, tab, video, transcript, transcriptLoading, transcriptError, loadTranscript]);
+  function changeTab(next: Tab) { setTab(next); }
   async function createJob(kind: 'download' | 'clip') {
     if (!video) return; setSubmitting(true); setError(''); setJobKind(kind);
     try { setJob(await api<Job>(`/${kind}`, { url: video.webpageUrl, quality, ...(kind === 'clip' ? { start: startSeconds, end: endSeconds } : {}) })); }
@@ -63,6 +86,7 @@ export default function Home() {
   return <div className="app-shell">
     <header className="topbar"><Link href="/" className="brand"><span className="brand-symbol"><Image src="/branding/clippery-logo.png" alt="" width={1034} height={621} priority /></span>Clippery<span className="version">BETA</span></Link><span className="header-note">Short-form editing utilities.</span></header>
     <main>
+      {sessionNotice && <p className="preview-status" role="status">{sessionNotice}</p>}
       <div className="intro"><h1>From source to edit in seconds.</h1><p>Download footage, cut exact segments and pull timestamped transcripts — built for short-form editors and creators.</p></div>
       <label className="field-label source-label" htmlFor="source-url">SOURCE</label><form className="url-form" onSubmit={analyze}><Link2 size={20}/><input id="source-url" aria-label="YouTube video URL" type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a YouTube or Shorts URL" disabled={analyzing || processing}/><button className="primary" disabled={analyzing || processing || !url.trim()}>{analyzing ? <><Loader2 className="spin" size={17}/>Analyzing</> : 'Analyze'}{!analyzing && <ArrowRight size={17}/>}</button></form>
       <div className="input-caption"><Youtube size={15}/><span>YouTube videos & Shorts</span></div>
