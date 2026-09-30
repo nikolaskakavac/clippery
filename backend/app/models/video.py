@@ -17,3 +17,11 @@ class DownloadRequest(VideoRequest):
 class ClipRequest(DownloadRequest):
     start: float = Field(ge=0, allow_inf_nan=False)
     end: float = Field(gt=0, allow_inf_nan=False)
+
+class ArchiveItem(BaseModel):
+    job_id: str = Field(min_length=1, max_length=64, pattern=r'^[a-zA-Z0-9_-]+$')
+    name: str = Field(min_length=1, max_length=120)
+    srt: str | None = Field(default=None, max_length=200_000)
+
+class ArchiveRequest(BaseModel):
+    clips: list[ArchiveItem] = Field(min_length=1, max_length=100)

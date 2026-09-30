@@ -17,6 +17,9 @@ type Props = {
 
 export default function ClipList({ video, start, end, valid, busy, quality, transcript, onBusy, onSelect }: Props) {
   const [clips, setClips] = useState<Clip[]>([]);
+  const [zipLoading, setZipLoading] = useState(false);
+  const [includeSrt, setIncludeSrt] = useState(false);
+  const zipRunning = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -118,6 +121,33 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
     }
   }
 
+  const readyClips = clips.filter(clip => results[clip.id]?.state === 'Ready');
+
+  async function downloadAll() {
+    if (busy || saving || zipRunning.current || !readyClips.length) return;
+    zipRunning.current = true; setZipLoading(true); onBusy(true); setNotice('');
+    try {
+      if (readyClips.length > 100) throw new Error('ZIP downloads support up to 100 ready clips at a time.');
+      const source = includeSrt ? transcript ?? captions.current ?? await api<Transcript>('/transcript', { url: video.webpageUrl }) : null;
+      if (source) captions.current = source;
+      const response = await fetch(`${API}/api/video/archive`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clips: readyClips.map(clip => ({ job_id: results[clip.id].job!.id, name: clip.name || 'Clip', srt: source ? clipSrt(source, clip.start, clip.end) : null })) }),
+      });
+      if (!response.ok) throw new Error(response.status === 404 ? 'A clip has expired. Export it again before downloading the ZIP.' : 'Could not prepare the ZIP. Try again.');
+      const url = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = url; link.download = `${clipFilename(video.title)}-clips.zip`;
+      link.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (mounted.current) setNotice(`ZIP downloaded with ${readyClips.length} clips.${source ? ' SRT files included where captions overlap.' : ''}`);
+    } catch (error) {
+      if (mounted.current) setNotice(error instanceof Error ? error.message : 'ZIP download failed. Try again.');
+    } finally {
+      zipRunning.current = false;
+      if (mounted.current) { setZipLoading(false); onBusy(false); }
+    }
+  }
+
   async function downloadSrt(clip: Clip) {
     if (captionRequest.current) return;
     const controller = new AbortController();
@@ -143,7 +173,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
 
   return <section className="clip-list" aria-label="Saved clips">
     <div className="clip-list-heading"><div><h2>Clips <span>{clips.length}</span></h2><p>Saved locally for this source. Export files expire; download them when ready.</p></div>
-      <div className="preview-capture"><button disabled={!loaded || !valid || busy || (editing !== null && results[editing]?.state === 'Saving')} onClick={saveRange}>{editing ? 'Save Range' : 'Add Clip'}</button>{editing && <button disabled={busy} onClick={() => setEditing(null)}>Cancel Edit</button>}<button disabled={!clips.length || busy || saving || video.duration > 10800} onClick={() => exportClips(clips)}>Export All</button><button disabled={!remaining.length || busy || video.duration > 10800} onClick={() => exportClips(remaining)}>Export Remaining{remaining.length > 0 && ` (${remaining.length})`}</button>{running.current && <button onClick={() => { stop.current = true; setNotice('Queue will stop after the current clip finishes.'); }}>Stop Queue</button>}</div>
+      <div className="preview-capture"><button disabled={!loaded || !valid || busy || (editing !== null && results[editing]?.state === 'Saving')} onClick={saveRange}>{editing ? 'Save Range' : 'Add Clip'}</button>{editing && <button disabled={busy} onClick={() => setEditing(null)}>Cancel Edit</button>}<button disabled={!clips.length || busy || saving || video.duration > 10800} onClick={() => exportClips(clips)}>Export All</button><button disabled={!remaining.length || busy || video.duration > 10800} onClick={() => exportClips(remaining)}>Export Remaining{remaining.length > 0 && ` (${remaining.length})`}</button><button disabled={busy || saving || zipLoading || !readyClips.length} onClick={downloadAll}>{zipLoading ? 'Preparing ZIP…' : `Download All ZIP (${readyClips.length})`}</button><label><input type="checkbox" checked={includeSrt} disabled={busy || zipLoading} onChange={event => setIncludeSrt(event.target.checked)}/> Include SRT</label>{running.current && <button onClick={() => { stop.current = true; setNotice('Queue will stop after the current clip finishes.'); }}>Stop Queue</button>}</div>
     </div>
     {notice && <p className="preview-status" role="status">{notice}</p>}
     {!clips.length && <p className="preview-status">Choose IN and OUT, then add your first clip.</p>}
@@ -154,7 +184,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
       <OutputDetails output={results[clip.id]?.job?.output}/>{results[clip.id]?.state === 'Ready' && <ExportPreview key={results[clip.id].job!.id} jobId={results[clip.id].job!.id}/>}
       <button className="seek-button" disabled={busy || results[clip.id]?.state === 'Saving' || video.duration > 10800} onClick={() => exportClips([clip])}>{results[clip.id]?.state === 'Failed' ? 'Retry' : 'Export Clip'}</button>
       <div className="preview-capture"><button onClick={() => onSelect(clip.start, clip.end, true)}>Preview</button><button disabled={busy} onClick={() => { setEditing(clip.id); onSelect(clip.start, clip.end, false); }}>Edit</button><button disabled={busy || !loaded} onClick={() => duplicateClip(clip)}>Duplicate</button><button disabled={busy || results[clip.id]?.state === 'Saving'} onClick={() => { setClips(items => items.filter(item => item.id !== clip.id)); if (editing === clip.id) setEditing(null); }}>Remove</button></div>
-      {results[clip.id] && <div className="saved-clip-result" role="status">{results[clip.id].state}{results[clip.id].job?.progress != null && !['Ready', 'Downloaded', 'Saving'].includes(results[clip.id].state) && ` · ${Math.round(results[clip.id].job!.progress!)}%`}{(results[clip.id].error || results[clip.id].job?.error) && <p className="error">{results[clip.id].error || results[clip.id].job?.error}</p>}{results[clip.id].state === 'Ready' && <button className="seek-button" onClick={() => download(clip, results[clip.id].job!)}>Download</button>}</div>}
+      {results[clip.id] && <div className="saved-clip-result" role="status">{results[clip.id].state}{results[clip.id].job?.progress != null && !['Ready', 'Downloaded', 'Saving'].includes(results[clip.id].state) && ` · ${Math.round(results[clip.id].job!.progress!)}%`}{(results[clip.id].error || results[clip.id].job?.error) && <p className="error">{results[clip.id].error || results[clip.id].job?.error}</p>}{results[clip.id].state === 'Ready' && <button disabled={zipLoading} className="seek-button" onClick={() => download(clip, results[clip.id].job!)}>Download</button>}</div>}
     </div>)}
   </section>;
 }
