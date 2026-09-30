@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { API, api, editTime, Job, Transcript, Video } from '@/lib/api';
 import { clipFilename, clipSrt } from '@/lib/clip-subtitles';
+import OutputDetails from '@/components/output-details';
 
 type Clip = { id: string; name: string; start: number; end: number };
 type Result = { state: string; job?: Job; error?: string };
@@ -104,7 +105,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
       link.href = url;
       link.download = `${clipFilename(clip.name)}.mp4`;
       link.click(); setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setResults(items => ({ ...items, [clip.id]: { state: 'Downloaded' } }));
+      setResults(items => ({ ...items, [clip.id]: { state: 'Downloaded', job } }));
     } catch (error) {
       setResults(items => ({ ...items, [clip.id]: { state: 'Failed', error: error instanceof Error ? error.message : 'Download failed.' } }));
     }
@@ -143,6 +144,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
       <input aria-label={`Name for ${editTime(clip.start)} clip`} maxLength={120} value={clip.name} disabled={busy} onChange={event => setClips(items => items.map(item => item.id === clip.id ? { ...item, name: event.target.value } : item))}/>
       <span className="saved-clip-time">{editTime(clip.start)} → {editTime(clip.end)}<small>LENGTH {editTime(clip.end - clip.start)}</small></span>
       <button className="seek-button" disabled={srtLoading !== null} onClick={() => downloadSrt(clip)}>{srtLoading === clip.id ? 'Loading SRT…' : 'Download SRT'}</button>
+      <OutputDetails output={results[clip.id]?.job?.output}/>
       <button className="seek-button" disabled={busy || results[clip.id]?.state === 'Saving' || video.duration > 10800} onClick={() => exportClips([clip])}>{results[clip.id]?.state === 'Failed' ? 'Retry' : 'Export Clip'}</button>
       <div className="preview-capture"><button onClick={() => onSelect(clip.start, clip.end, true)}>Preview</button><button disabled={busy} onClick={() => { setEditing(clip.id); onSelect(clip.start, clip.end, false); }}>Edit</button><button disabled={busy || results[clip.id]?.state === 'Saving'} onClick={() => { setClips(items => items.filter(item => item.id !== clip.id)); if (editing === clip.id) setEditing(null); }}>Remove</button></div>
       {results[clip.id] && <div className="saved-clip-result" role="status">{results[clip.id].state}{results[clip.id].job?.progress != null && !['Ready', 'Downloaded', 'Saving'].includes(results[clip.id].state) && ` · ${Math.round(results[clip.id].job!.progress!)}%`}{(results[clip.id].error || results[clip.id].job?.error) && <p className="error">{results[clip.id].error || results[clip.id].job?.error}</p>}{results[clip.id].state === 'Ready' && <button className="seek-button" onClick={() => download(clip, results[clip.id].job!)}>Download</button>}</div>}

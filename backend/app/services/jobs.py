@@ -8,6 +8,7 @@ from app.services.storage import LocalStorage
 from app.services.video_service import extract, ServiceError
 from app.services.download_service import process
 from app.services.clip_service import create_clip
+from app.services.output_metadata import output_metadata
 from app.utils.validation import normalize_url
 
 class JobManager:
@@ -23,7 +24,7 @@ class JobManager:
                 raise ServiceError('Another video is processing. Please wait until it finishes.')
             job_id = uuid.uuid4().hex
             self.jobs[job_id] = {'id': job_id, 'state': 'Preparing', 'progress': 0,
-                                 'error': None, 'created': time.time(), 'readers': 0}
+                                 'error': None, 'output': None, 'created': time.time(), 'readers': 0}
             self.pool.submit(self.run, job_id, request, clip)
             return self.public(job_id)
 
@@ -32,7 +33,7 @@ class JobManager:
             job = self.jobs.get(job_id)
             if not job:
                 return None
-            return {k: job[k] for k in ('id', 'state', 'progress', 'error')}
+            return {k: job.get(k) for k in ('id', 'state', 'progress', 'error', 'output')}
 
     def update(self, job_id, state, progress):
         with self.lock:
@@ -50,8 +51,14 @@ class JobManager:
                 if info['duration'] > MAX_DOWNLOAD_SECONDS:
                     raise ServiceError('Full downloads are limited to 60 minutes. Use Clip for longer videos.')
                 output = process(url, request.quality, directory, update)
+            try:
+                details = output_metadata(output)
+            except Exception:
+                # Display metadata must not prevent downloading a completed export.
+                logging.getLogger(__name__).exception('Could not inspect output metadata: %s', job_id)
+                details = None
             with self.lock:
-                self.jobs[job_id].update(path=output, state='Ready', progress=100, created=time.time())
+                self.jobs[job_id].update(path=output, output=details, state='Ready', progress=100, created=time.time())
         except Exception as exc:
             logging.getLogger(__name__).exception('Processing job failed: %s', job_id)
             message = str(exc) if isinstance(exc, (ServiceError, ValueError)) else 'Video processing failed. Check that FFmpeg is installed, or try another public video.'
