@@ -74,11 +74,12 @@ class JobManager:
             job['readers'] += 1
             return job['path']
 
-    def release(self, job_id):
+    def release(self, job_id, consume=True):
         with self.lock:
             if job_id in self.jobs:
                 self.jobs[job_id]['readers'] -= 1
-                self.jobs[job_id]['created'] = time.time() - JOB_TTL
+                if consume:
+                    self.jobs[job_id]['created'] = time.time() - JOB_TTL
         self.cleanup()
 
     def cleanup(self):

@@ -32,12 +32,13 @@ def status(job_id: str):
     return job
 
 @router.get('/jobs/{job_id}/file')
-def file(job_id: str, request: Request):
-    if 'range' in request.headers:
+def file(job_id: str, request: Request, preview: bool = False):
+    if not preview and 'range' in request.headers:
         raise HTTPException(416, 'Partial downloads are not supported. Download the complete file.')
     path = manager.acquire(job_id)
     if path is None:
         raise HTTPException(404, 'This file is not ready or has expired.')
     return FileResponse(path, media_type='video/mp4', filename=f'clipper-{job_id[:8]}.mp4',
-                        background=BackgroundTask(manager.release, job_id))
+                        content_disposition_type='inline' if preview else 'attachment',
+                        background=BackgroundTask(manager.release, job_id, consume=not preview))
 

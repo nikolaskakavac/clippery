@@ -236,3 +236,6 @@ footer span span { padding: 0 7px; color: #565962; }
   .clip-controls .time-grid { grid-template-columns: 1fr; }
 }
 
+
+.export-preview { flex-basis: 100%; margin: 8px 0; }
+.export-preview video { display: block; width: 100%; max-width: 640px; max-height: 360px; margin-top: 10px; background: #000; border: 1px solid var(--border); border-radius: 3px; }
