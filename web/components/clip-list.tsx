@@ -53,12 +53,17 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
     } else setClips(items => [...items, { id: crypto.randomUUID(), name: `Clip ${items.length + 1}`, start, end }]);
   }
 
-  async function exportAll() {
-    if (busy || running.current || !clips.length) return;
+  const remaining = clips.filter(clip => !results[clip.id] || ['Failed', 'Not exported'].includes(results[clip.id].state));
+  const saving = Object.values(results).some(result => result.state === 'Saving');
+
+  async function exportClips(selected: Clip[]) {
+    if (busy || running.current || !selected.length || video.duration > 10800 || selected.some(clip => results[clip.id]?.state === 'Saving')) return;
     running.current = true; stop.current = false; onBusy(true);
-    setResults(Object.fromEntries(clips.map(clip => [clip.id, { state: 'Queued' }])));
+    setNotice('');
+    const selectedIds = new Set(selected.map(clip => clip.id));
+    setResults(items => ({ ...items, ...Object.fromEntries(selected.map(clip => [clip.id, { state: 'Queued' }])) }));
     try {
-      for (const clip of clips) {
+      for (const clip of selected) {
         if (stop.current || !mounted.current) break;
         let submitted = false;
         try {
@@ -83,7 +88,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
     } finally {
       running.current = false;
       if (mounted.current) {
-        setResults(items => Object.fromEntries(Object.entries(items).map(([id, result]) => [id, result.state === 'Queued' ? { state: 'Not exported' } : result])));
+        setResults(items => Object.fromEntries(Object.entries(items).map(([id, result]) => [id, selectedIds.has(id) && result.state === 'Queued' ? { state: 'Not exported' } : result])));
         onBusy(false);
       }
     }
@@ -130,7 +135,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
 
   return <section className="clip-list" aria-label="Saved clips">
     <div className="clip-list-heading"><div><h2>Clips <span>{clips.length}</span></h2><p>Saved locally for this source. Export files expire; download them when ready.</p></div>
-      <div className="preview-capture"><button disabled={!loaded || !valid || busy} onClick={saveRange}>{editing ? 'Save Range' : 'Add Clip'}</button>{editing && <button disabled={busy} onClick={() => setEditing(null)}>Cancel Edit</button>}<button disabled={!clips.length || busy || video.duration > 10800} onClick={exportAll}>Export All</button>{running.current && <button onClick={() => { stop.current = true; setNotice('Queue will stop after the current clip finishes.'); }}>Stop Queue</button>}</div>
+      <div className="preview-capture"><button disabled={!loaded || !valid || busy || (editing !== null && results[editing]?.state === 'Saving')} onClick={saveRange}>{editing ? 'Save Range' : 'Add Clip'}</button>{editing && <button disabled={busy} onClick={() => setEditing(null)}>Cancel Edit</button>}<button disabled={!clips.length || busy || saving || video.duration > 10800} onClick={() => exportClips(clips)}>Export All</button><button disabled={!remaining.length || busy || video.duration > 10800} onClick={() => exportClips(remaining)}>Export Remaining{remaining.length > 0 && ` (${remaining.length})`}</button>{running.current && <button onClick={() => { stop.current = true; setNotice('Queue will stop after the current clip finishes.'); }}>Stop Queue</button>}</div>
     </div>
     {notice && <p className="preview-status" role="status">{notice}</p>}
     {!clips.length && <p className="preview-status">Choose IN and OUT, then add your first clip.</p>}
@@ -138,6 +143,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
       <input aria-label={`Name for ${editTime(clip.start)} clip`} maxLength={120} value={clip.name} disabled={busy} onChange={event => setClips(items => items.map(item => item.id === clip.id ? { ...item, name: event.target.value } : item))}/>
       <span className="saved-clip-time">{editTime(clip.start)} → {editTime(clip.end)}<small>LENGTH {editTime(clip.end - clip.start)}</small></span>
       <button className="seek-button" disabled={srtLoading !== null} onClick={() => downloadSrt(clip)}>{srtLoading === clip.id ? 'Loading SRT…' : 'Download SRT'}</button>
+      <button className="seek-button" disabled={busy || results[clip.id]?.state === 'Saving' || video.duration > 10800} onClick={() => exportClips([clip])}>{results[clip.id]?.state === 'Failed' ? 'Retry' : 'Export Clip'}</button>
       <div className="preview-capture"><button onClick={() => onSelect(clip.start, clip.end, true)}>Preview</button><button disabled={busy} onClick={() => { setEditing(clip.id); onSelect(clip.start, clip.end, false); }}>Edit</button><button disabled={busy || results[clip.id]?.state === 'Saving'} onClick={() => { setClips(items => items.filter(item => item.id !== clip.id)); if (editing === clip.id) setEditing(null); }}>Remove</button></div>
       {results[clip.id] && <div className="saved-clip-result" role="status">{results[clip.id].state}{results[clip.id].job?.progress != null && !['Ready', 'Downloaded', 'Saving'].includes(results[clip.id].state) && ` · ${Math.round(results[clip.id].job!.progress!)}%`}{(results[clip.id].error || results[clip.id].job?.error) && <p className="error">{results[clip.id].error || results[clip.id].job?.error}</p>}{results[clip.id].state === 'Ready' && <button className="seek-button" onClick={() => download(clip, results[clip.id].job!)}>Download</button>}</div>}
     </div>)}
