@@ -239,3 +239,13 @@ footer span span { padding: 0 7px; color: #565962; }
 
 .export-preview { flex-basis: 100%; margin: 8px 0; }
 .export-preview video { display: block; width: 100%; max-width: 640px; max-height: 360px; margin-top: 10px; background: #000; border: 1px solid var(--border); border-radius: 3px; }
+
+.quick-download { margin-top: 20px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+.quick-download-form > div { display: flex; gap: 10px; }
+.quick-download-form input { flex: 1; width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); padding: 10px; border-radius: 3px; }
+.quick-download-source { display: flex; gap: 14px; align-items: center; margin-top: 16px; }
+.quick-download-source img { width: 64px; height: 88px; object-fit: cover; border-radius: 3px; }
+.quick-download-source > div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.quick-download-source strong { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.quick-download-source p { color: var(--muted); font-size: 13px; }
+@media (max-width: 600px) { .quick-download-source { flex-wrap: wrap; } .quick-download-source > button { width: 100%; } }

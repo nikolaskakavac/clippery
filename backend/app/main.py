@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from app.config import FRONTEND_ORIGIN
 from app.api.video import router
+from app.api.quick_download import router as quick_download_router
 from app.services.jobs import manager
 from app.services.video_service import ServiceError
 
@@ -28,6 +29,7 @@ app = FastAPI(title='ClipPer API', lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[FRONTEND_ORIGIN.rstrip('/')],
                    allow_methods=['GET', 'POST'], allow_headers=['Content-Type'])
 app.include_router(router)
+app.include_router(quick_download_router)
 
 @app.exception_handler(ServiceError)
 async def service_error(request: Request, exc: ServiceError):
