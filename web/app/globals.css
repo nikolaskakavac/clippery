@@ -262,3 +262,7 @@ footer span span { padding: 0 7px; color: #565962; }
 .history-source span { min-width: 0; }
 .history-source strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .history-source small { color: var(--muted); }
+
+.clip-selection { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted); }
+.clip-selection small { flex-basis: 100%; }
+.saved-clip input.clip-select { flex: 0 0 auto; width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
