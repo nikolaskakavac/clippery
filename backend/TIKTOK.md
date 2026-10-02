@@ -17,6 +17,8 @@ No accounts, cookies, proxies, history, or persistence are added.
 
 TikTok can block server IPs or require browser impersonation capabilities not
 installed in the existing environment. Such failures retain detailed server
-logs and return a concise safe error. The live smoke test in the implementation
-environment received an IP-blocked response; successful live delivery was not
-verified. Automated tests cover selection, delivery, cleanup and error handling.
+logs and return a concise safe error. An initial live fixture received an
+IP-blocked response. On 2026-10-02 a user-supplied public video from skellywild
+successfully returned metadata and downloaded 5,661,452 bytes (67 seconds).
+This verifies delivery for that video, not availability of every TikTok post.
+Automated tests cover selection, delivery, cleanup and error handling.

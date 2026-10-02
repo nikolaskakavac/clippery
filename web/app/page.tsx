@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import QuickDownload from '@/components/quick-download';
+import SourceHistory from '@/components/source-history';
 import Image from 'next/image';
 import SourcePreview from '@/components/source-preview';
 import ClipList from '@/components/clip-list';
@@ -20,6 +21,7 @@ function Highlight({ text, query }: { text: string; query: string }) {
   parts.push(text.slice(cursor)); return <>{parts}</>;
 }
 export default function Home() {
+  const [historySource, setHistorySource] = useState<Video | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionNotice, setSessionNotice] = useState('');
   const [url, setUrl] = useState(''); const [video, setVideo] = useState<Video | null>(null); const [tab, setTab] = useState<Tab>('download');
@@ -62,8 +64,12 @@ export default function Home() {
     timer = setTimeout(poll, 1000); return () => { controller.abort(); clearTimeout(timer); };
   }, [job]);
   async function analyze(e: React.FormEvent) {
-    e.preventDefault(); const current = ++generation.current; captionController.current?.abort(); setTranscriptLoading(false); setAnalyzing(true); setError('');
-    try { const result = await api<Video>('/info', { url }); if (current !== generation.current) return; setVideo(result); setPreviewSeek(null); setTranscript(null); setTranscriptError(''); setTranscriptLoading(false); setSelection(null); setQuery(''); setPage(0); setJob(null); setPollError(''); setStart('00:00:00'); setEnd(editTime(Math.min(30, result.duration))); setTab('download'); }
+    e.preventDefault(); void loadSource(url);
+  }
+  async function loadSource(sourceUrl: string) {
+    if (analyzing || processing) return;
+    setUrl(sourceUrl); const current = ++generation.current; captionController.current?.abort(); setTranscriptLoading(false); setAnalyzing(true); setError('');
+    try { const result = await api<Video>('/info', { url: sourceUrl }); if (current !== generation.current) return; setVideo(result); setHistorySource(result); setPreviewSeek(null); setTranscript(null); setTranscriptError(''); setTranscriptLoading(false); setSelection(null); setQuery(''); setPage(0); setJob(null); setPollError(''); setStart('00:00:00'); setEnd(editTime(Math.min(30, result.duration))); setTab('download'); }
     catch (e) { setError(message(e)); } finally { setAnalyzing(false); }
   }
   const loadTranscript = useCallback(async () => {
@@ -91,7 +97,7 @@ export default function Home() {
     <main>
       {sessionNotice && <p className="preview-status" role="status">{sessionNotice}</p>}
       <div className="intro"><h1>From source to edit in seconds.</h1><p>Download footage, cut exact segments and pull timestamped transcripts — built for short-form editors and creators.</p></div>
-      <label className="field-label source-label" htmlFor="source-url">SOURCE</label><form className="url-form" onSubmit={analyze}><Link2 size={20}/><input id="source-url" aria-label="YouTube video URL" type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a YouTube or Shorts URL" disabled={analyzing || processing}/><button className="primary" disabled={analyzing || processing || !url.trim()}>{analyzing ? <><Loader2 className="spin" size={17}/>Analyzing</> : 'Analyze'}{!analyzing && <ArrowRight size={17}/>}</button></form>
+      <label className="field-label source-label" htmlFor="source-url">SOURCE</label><form className="url-form" onSubmit={analyze}><Link2 size={20}/><input id="source-url" aria-label="YouTube video URL" type="url" required value={url} onChange={e => setUrl(e.target.value)} placeholder="Paste a YouTube or Shorts URL" disabled={analyzing || processing}/><button className="primary" disabled={analyzing || processing || !url.trim()}>{analyzing ? <><Loader2 className="spin" size={17}/>Analyzing</> : 'Analyze'}{!analyzing && <ArrowRight size={17}/>}</button></form><SourceHistory video={historySource} disabled={analyzing || processing} onSelect={item => { void loadSource(item.webpageUrl); }}/>
       <div className="input-caption"><Youtube size={15}/><span>YouTube videos & Shorts</span></div>
       {error && <div className="error" role="alert">{error}</div>}
       {analyzing ? <div className="video-card skeleton" aria-label="Analyzing video"><div/><section><i/><i/><i/></section></div> : video ? <section className="video-card">
