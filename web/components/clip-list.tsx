@@ -5,6 +5,7 @@ import { API, api, editTime, Job, Transcript, Video } from '@/lib/api';
 import { clipFilename, clipSrt } from '@/lib/clip-subtitles';
 import OutputDetails from '@/components/output-details';
 import ExportPreview from '@/components/export-preview';
+import PasteClips from '@/components/paste-clips';
 
 type Clip = { id: string; name: string; start: number; end: number };
 type Result = { state: string; job?: Job; error?: string };
@@ -187,6 +188,7 @@ export default function ClipList({ video, start, end, valid, busy, quality, tran
       {selectedClips.length > 0 && !selectionReady && <small>Export all selected clips before downloading their ZIP.</small>}
       {selectedClips.length > 100 && <small>Select up to 100 clips for one ZIP.</small>}
     </div>}
+    <PasteClips duration={video.duration} disabled={busy || !loaded} onAdd={drafts => { const added = drafts.map(draft => ({ ...draft, id: crypto.randomUUID() })); setClips(items => [...items, ...added]); setNotice(`${added.length} clips added. Review or export them from the list.`); }}/>
     {notice && <p className="preview-status" role="status">{notice}</p>}
     {!clips.length && <p className="preview-status">Choose IN and OUT, then add your first clip.</p>}
     {clips.map(clip => <div className={`saved-clip ${editing === clip.id ? 'saved-clip-editing' : ''}`} key={clip.id}>
