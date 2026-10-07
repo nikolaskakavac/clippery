@@ -75,10 +75,12 @@ def archive(request: ArchiveRequest):
                              background=BackgroundTask(output.close))
 
 @router.get('/jobs/{job_id}/file')
-def file(job_id: str, request: Request, preview: bool = False):
+def file(job_id: str, request: Request, preview: bool = False, original: bool = False):
+    if original and not preview:
+        raise HTTPException(400, 'The original clip is available for preview only.')
     if not preview and 'range' in request.headers:
         raise HTTPException(416, 'Partial downloads are not supported. Download the complete file.')
-    path = manager.acquire(job_id)
+    path = manager.acquire(job_id, original=original)
     if path is None:
         raise HTTPException(404, 'This file is not ready or has expired.')
     name = manager.public(job_id).get('filename') or f'clipper-{job_id[:8]}.mp4'

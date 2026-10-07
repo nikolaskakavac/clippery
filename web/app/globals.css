@@ -283,3 +283,6 @@ footer span span { padding: 0 7px; color: #565962; }
 .export-name input { display: block; width: 100%; margin-top: 6px; padding: 9px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 3px; font-size: 13px; letter-spacing: normal; }
 .silence-toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
 .silence-toggle input, .saved-clip .silence-toggle input { flex: 0 0 auto; width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }
+
+.export-preview .preview-capture { margin-top: 10px; }
+.export-preview .preview-capture button[aria-pressed=true] { background: var(--accent-surface); color: var(--accent); border-color: var(--accent); }

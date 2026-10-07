@@ -53,10 +53,16 @@ def test_enabled_silence_uses_bounded_clip_and_publishes_map(manager, monkeypatc
     mapping = {'beforeDuration': 5, 'afterDuration': 3, 'segments': [{'start': 2, 'end': 5}]}
     def cut(path, update):
         assert path.read_bytes() == b'bounded'
-        return path, mapping
+        output = path.parent / 'clipper-silence.mp4'
+        output.write_bytes(b'processed')
+        return output, mapping
     monkeypatch.setattr(jobs, 'remove_silence', cut)
     job = manager.submit(ClipRequest(url=URL, start=10, end=15, remove_silence=True), clip=True)
-    assert finish(manager, job['id'])['silence'] == mapping
+    result = finish(manager, job['id'])
+    assert result['silence'] == mapping and result['hasOriginal'] is True
+    original = manager.acquire(job['id'], original=True)
+    assert original.read_bytes() == b'bounded'
+    manager.release(job['id'], consume=False)
     assert not hasattr(DownloadRequest(url=URL), 'remove_silence')
 
 

@@ -29,7 +29,7 @@ class JobManager:
                                  'error': None, 'output': None, 'created': time.time(), 'readers': 0,
                                  'filename': export_filename(request.filename, f'clipper-{job_id[:8]}'),
                                  'clipRange': {'start': request.start, 'end': request.end} if clip else None,
-                                 'silence': None}
+                                 'silence': None, 'hasOriginal': False}
             self.pool.submit(self.run, job_id, request, clip)
             return self.public(job_id)
 
@@ -38,7 +38,7 @@ class JobManager:
             job = self.jobs.get(job_id)
             if not job:
                 return None
-            return {k: job.get(k) for k in ('id', 'state', 'progress', 'error', 'output', 'filename', 'clipRange', 'silence')}
+            return {k: job.get(k) for k in ('id', 'state', 'progress', 'error', 'output', 'filename', 'clipRange', 'silence', 'hasOriginal')}
 
     def update(self, job_id, state, progress):
         with self.lock:
@@ -53,9 +53,12 @@ class JobManager:
             if clip:
                 output = create_clip(url, request.quality, directory, update, request.start, request.end, info['duration'])
                 if request.remove_silence:
+                    original = output
                     output, silence = remove_silence(output, update)
                     with self.lock:
                         self.jobs[job_id]['silence'] = silence
+                        if output != original:
+                            self.jobs[job_id].update(original_path=original, hasOriginal=True)
             else:
                 if info['duration'] > MAX_DOWNLOAD_SECONDS:
                     raise ServiceError('Full downloads are limited to 60 minutes. Use Clip for longer videos.')
@@ -75,13 +78,16 @@ class JobManager:
                 self.jobs[job_id].update(state='Failed', error=message, created=time.time())
             self.storage.remove(job_id)
 
-    def acquire(self, job_id):
+    def acquire(self, job_id, original=False):
         with self.lock:
             job = self.jobs.get(job_id)
-            if not job or job['state'] != 'Ready' or not job['path'].is_file():
+            if not job or job['state'] != 'Ready':
+                return None
+            path = job.get('original_path' if original else 'path')
+            if path is None or not path.is_file():
                 return None
             job['readers'] += 1
-            return job['path']
+            return path
 
     def release(self, job_id, consume=True):
         with self.lock:
