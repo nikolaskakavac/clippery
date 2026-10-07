@@ -278,3 +278,8 @@ footer span span { padding: 0 7px; color: #565962; }
 .paste-clips ul { list-style: none; padding: 0; max-height: 240px; overflow-y: auto; }
 .paste-clips li { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; font-size: 12px; }
 .paste-clips li span { font-family: var(--mono); }
+
+.export-name { display: block; margin: 12px 0; }
+.export-name input { display: block; width: 100%; margin-top: 6px; padding: 9px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 3px; font-size: 13px; letter-spacing: normal; }
+.silence-toggle { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.silence-toggle input, .saved-clip .silence-toggle input { flex: 0 0 auto; width: 16px; height: 16px; padding: 0; accent-color: var(--accent); }

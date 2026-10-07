@@ -10,6 +10,8 @@ from app.services.download_service import process
 from app.services.clip_service import create_clip
 from app.services.output_metadata import output_metadata
 from app.utils.validation import normalize_url
+from app.utils.filename import export_filename
+from app.services.silence_service import remove_silence
 
 class JobManager:
     def __init__(self):
@@ -24,7 +26,10 @@ class JobManager:
                 raise ServiceError('Another video is processing. Please wait until it finishes.')
             job_id = uuid.uuid4().hex
             self.jobs[job_id] = {'id': job_id, 'state': 'Preparing', 'progress': 0,
-                                 'error': None, 'output': None, 'created': time.time(), 'readers': 0}
+                                 'error': None, 'output': None, 'created': time.time(), 'readers': 0,
+                                 'filename': export_filename(request.filename, f'clipper-{job_id[:8]}'),
+                                 'clipRange': {'start': request.start, 'end': request.end} if clip else None,
+                                 'silence': None}
             self.pool.submit(self.run, job_id, request, clip)
             return self.public(job_id)
 
@@ -33,7 +38,7 @@ class JobManager:
             job = self.jobs.get(job_id)
             if not job:
                 return None
-            return {k: job.get(k) for k in ('id', 'state', 'progress', 'error', 'output')}
+            return {k: job.get(k) for k in ('id', 'state', 'progress', 'error', 'output', 'filename', 'clipRange', 'silence')}
 
     def update(self, job_id, state, progress):
         with self.lock:
@@ -47,6 +52,10 @@ class JobManager:
             update = lambda state, progress: self.update(job_id, state, progress)
             if clip:
                 output = create_clip(url, request.quality, directory, update, request.start, request.end, info['duration'])
+                if request.remove_silence:
+                    output, silence = remove_silence(output, update)
+                    with self.lock:
+                        self.jobs[job_id]['silence'] = silence
             else:
                 if info['duration'] > MAX_DOWNLOAD_SECONDS:
                     raise ServiceError('Full downloads are limited to 60 minutes. Use Clip for longer videos.')

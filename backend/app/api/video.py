@@ -81,7 +81,8 @@ def file(job_id: str, request: Request, preview: bool = False):
     path = manager.acquire(job_id)
     if path is None:
         raise HTTPException(404, 'This file is not ready or has expired.')
-    return FileResponse(path, media_type='video/mp4', filename=f'clipper-{job_id[:8]}.mp4',
+    name = manager.public(job_id).get('filename') or f'clipper-{job_id[:8]}.mp4'
+    return FileResponse(path, media_type='video/mp4', filename=name,
                         content_disposition_type='inline' if preview else 'attachment',
                         background=BackgroundTask(manager.release, job_id, consume=not preview))
 

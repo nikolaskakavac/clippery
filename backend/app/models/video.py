@@ -13,10 +13,12 @@ class VideoRequest(BaseModel):
 
 class DownloadRequest(VideoRequest):
     quality: Literal['best', '1080', '720'] = '1080'
+    filename: str | None = Field(default=None, max_length=120)
 
 class ClipRequest(DownloadRequest):
     start: float = Field(ge=0, allow_inf_nan=False)
     end: float = Field(gt=0, allow_inf_nan=False)
+    remove_silence: bool = False
 
 class ArchiveItem(BaseModel):
     job_id: str = Field(min_length=1, max_length=64, pattern=r'^[a-zA-Z0-9_-]+$')
