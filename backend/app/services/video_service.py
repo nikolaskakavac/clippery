@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 from pathlib import Path
 
 from yt_dlp import YoutubeDL
@@ -12,9 +14,27 @@ BGUTIL_SERVER_HOME = Path(__file__).resolve().parents[2] / 'vendor' / 'bgutil-yt
 class ServiceError(Exception):
     pass
 
+class DiagnosticLog:
+    """Expose provider/runtime messages without dumping request configuration."""
+    def debug(self, message):
+        if any(marker in message.lower() for marker in (
+            '[pot]', 'bgutil', 'js runtimes', 'yt-dlp version', 'plugin directories',
+        )):
+            message = re.sub(r'https?://\S+', '[URL omitted]', message)
+            logger.warning('YouTube diagnostic: %s', message)
+
+    def warning(self, message):
+        logger.warning(message)
+
+    def error(self, message):
+        logger.error(message)
+
+
 def options() -> dict:
+    diagnostic = os.getenv('YTDLP_DIAGNOSTICS', '').lower() in {'1', 'true'}
     return {'quiet': True, 'no_warnings': False, 'noplaylist': True,
-            'logger': logger,
+            'verbose': diagnostic,
+            'logger': DiagnosticLog() if diagnostic else logger,
             'extractor_args': {
                 'youtube': {'player_client': ['mweb']},
                 'youtubepot-bgutilscript': {'server_home': [str(BGUTIL_SERVER_HOME)]},
