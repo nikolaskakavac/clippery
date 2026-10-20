@@ -17,7 +17,9 @@ def test_provider_diagnostics(caplog):
     with caplog.at_level(logging.WARNING):
         log = DiagnosticLog()
         log.debug('[debug] Proxy map: secret-proxy')
-        log.debug('[debug] [pot] bgutil available https://example.com/?token=private')
+        log.debug("[debug] params: {'bgutil': 'private-config'}")
+        log.debug('[debug] [youtube] [pot] bgutil available https://example.com/?token=private')
+        log.debug('[debug] [youtube] [pot:bgutil:script-node] Executing command to get POT via script: node --context private-visitor')
         log.warning('provider warning')
         log.error('provider error')
     assert 'bgutil available' in caplog.text
@@ -25,3 +27,7 @@ def test_provider_diagnostics(caplog):
     assert 'token=private' not in caplog.text
     assert 'provider warning' in caplog.text
     assert 'provider error' in caplog.text
+
+    assert 'private-config' not in caplog.text
+    assert 'private-visitor' not in caplog.text
+    assert 'Invoking token generator' in caplog.text

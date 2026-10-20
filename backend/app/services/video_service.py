@@ -17,9 +17,12 @@ class ServiceError(Exception):
 class DiagnosticLog:
     """Expose provider/runtime messages without dumping request configuration."""
     def debug(self, message):
-        if any(marker in message.lower() for marker in (
-            '[pot]', 'bgutil', 'js runtimes', 'yt-dlp version', 'plugin directories',
-        )):
+        if re.match(
+            r'^\[debug\] (?:yt-dlp version |JS runtimes:|Plugin directories:|'
+            r'\[youtube\] \[pot(?:\]|:))', message
+        ):
+            if 'Executing command to get POT via script:' in message:
+                message = message.split('Executing command', 1)[0] + 'Invoking token generator (arguments omitted)'
             message = re.sub(r'https?://\S+', '[URL omitted]', message)
             logger.warning('YouTube diagnostic: %s', message)
 
