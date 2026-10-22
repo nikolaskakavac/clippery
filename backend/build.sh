@@ -4,6 +4,8 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 node -e 'if (Number(process.versions.node.split(".")[0]) < 22) { throw new Error("bgutil requires Node.js 22+ at build and runtime"); }'
 python -m pip install -r requirements.txt
+# Verify the actual backend toolchain, not the separate frontend runtime.
+python -m app.diagnostics --check-runtime --skip-cookies
 
 # Match the Python plugin to the official 2.0.0 generator, including its npm lockfile.
 provider_dir="$PWD/vendor/bgutil-ytdlp-pot-provider"

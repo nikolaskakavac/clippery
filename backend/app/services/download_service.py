@@ -3,11 +3,12 @@ import subprocess
 import shutil
 import logging
 import copy
+import time
 from pathlib import Path
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import download_range_func
 from app.config import MAX_RESOLUTION
-from app.services.video_service import options, ServiceError, BGUTIL_SERVER_HOME
+from app.services.video_service import ServiceError, BGUTIL_SERVER_HOME, run_youtube, DiagnosticLog
 
 logger = logging.getLogger('uvicorn.error')
 
@@ -17,15 +18,15 @@ class ExtractionLog:
         self.incomplete = False
 
     def debug(self, message):
-        logger.debug(message)
+        DiagnosticLog().debug(message)
 
     def warning(self, message):
         if ('missing a URL' in message or 'PO Token which was not provided' in message):
             self.incomplete = True
-        logger.warning(message)
+        DiagnosticLog().warning(message)
 
     def error(self, message):
-        logger.error(message)
+        DiagnosticLog().error(message)
 
 
 def resolve_source(ydl, url, audit):
@@ -104,7 +105,39 @@ def usable_section(path: Path, duration: float) -> bool:
                              '-f', 'null', '-'], capture_output=True, timeout=30)
     return result.returncode == 0
 
+
+def precise_local_clip(source: Path, output: Path, duration: float, update, highest=False) -> bool:
+    """Keep the downloaded section's zero-based presentation timeline; discard preroll."""
+    update('Merging', None)
+    started = time.monotonic()
+    try:
+        subprocess.run(['ffmpeg', '-nostdin', '-y', '-ss', '0', '-i', str(source),
+            '-t', str(duration), '-map', '0:v:0', '-map', '0:a:0?',
+            '-c:v', 'libx264', *clip_video_args(highest), '-fps_mode', 'passthrough',
+            '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', str(output)],
+            capture_output=True, timeout=3600, check=True)
+        return usable_section(output, duration)
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.warning('Local precise cut failed; retrying bounded source: %s', exc)
+        return False
+    finally:
+        logger.info('Clip local precise cut: %.2fs', time.monotonic() - started)
+
 def process(url: str, quality: str, directory: Path, update, section=None) -> Path:
+    attempted = False
+    def execute(session_options):
+        nonlocal attempted
+        if attempted:
+            # A retry must not append to files created under another auth session.
+            for path in directory.iterdir():
+                if path.is_file() and (path.name.startswith('source.') or path.name == 'clipper.mp4'):
+                    path.unlink()
+        attempted = True
+        return _process(url, quality, directory, update, section, session_options)
+    return run_youtube(execute)
+
+
+def _process(url, quality, directory, update, section, session_options) -> Path:
     if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
         raise ServiceError('FFmpeg and ffprobe must be installed on the backend before processing video.')
     check_source_provider()
@@ -122,7 +155,7 @@ def process(url: str, quality: str, directory: Path, update, section=None) -> Pa
             update('Downloading', min(90, data.get('downloaded_bytes', 0) / total * 90) if total else None)
         elif data['status'] == 'finished':
             update('Merging', 92)
-    opts = {**options(), 'format': format_selector(quality),
+    opts = {**session_options, 'format': format_selector(quality),
             'format_sort': ['res', 'vcodec:h264', 'acodec:aac'],
             'outtmpl': str(directory / 'source.%(ext)s'), 'merge_output_format': 'mp4',
             'progress_hooks': [progress]}
@@ -148,15 +181,23 @@ def process(url: str, quality: str, directory: Path, update, section=None) -> Pa
                     'streams': [{k: f.get(k) for k in fields} for f in source_info.get('requested_formats', [source_info])]}))
             # Reuse the resolved source for accurate-cut retries; don't ask YouTube
             # for a new session which may expose a different, lower-quality set.
+            update('Downloading', None)
+            started = time.monotonic()
             ydl.process_ie_result(copy.deepcopy(source_info), download=True)
+            logger.info('Source download attempt %s: %.2fs', attempt, time.monotonic() - started)
         sources = [p for p in directory.glob('source.*') if p.suffix in {'.mp4', '.mkv', '.webm'}]
         if len(sources) != 1:
             raise ServiceError('Video processing did not produce a usable file.')
         output = directory / 'clipper.mp4'
         editor_mp4(sources[0], output, update, clip=section is not None, highest=quality == 'best')
-        sources[0].unlink(missing_ok=True)
         if not section or usable_section(output, section[1] - section[0]):
+            sources[0].unlink(missing_ok=True)
             return output
+        if not attempt and precise_local_clip(sources[0], output, section[1] - section[0], update, quality == 'best'):
+            log_media('local precise output', output, probe(output))
+            sources[0].unlink(missing_ok=True)
+            return output
+        sources[0].unlink(missing_ok=True)
         output.unlink(missing_ok=True)
     raise ServiceError('The source could not produce an accurate, playable clip. Try slightly different timestamps.')
 

@@ -1,12 +1,21 @@
 services:
   - type: web
-    name: clipper-api
-    runtime: docker
+    name: clippery-api
+    runtime: python
     rootDir: backend
-    plan: starter
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: NODE_VERSION
+        value: 24.14.0
       - key: FRONTEND_ORIGIN
         sync: false
       - key: JOB_ROOT
         value: /tmp/jobs
+      - key: YTDLP_DIAGNOSTICS
+        value: "0"
+# Optional YOUTUBE_COOKIES_BASE64 is set as a secret in the dashboard, never here.

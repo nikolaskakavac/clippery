@@ -10,3 +10,9 @@ tmp/
 .npm-cache/
 .tools/
 backend/vendor/bgutil-ytdlp-pot-provider/
+
+# Session credentials (never commit browser cookie exports).
+*cookies*.txt
+*cookies*.json
+*cookies*.b64
+.cookies/

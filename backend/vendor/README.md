@@ -14,13 +14,13 @@ No provider code is modified. Upstream source and license remain in the checkout
 
 - Root Directory: `backend`
 - Build Command: `bash build.sh`
-- Environment: `NODE_VERSION=22.22.3`
+- Environment: `NODE_VERSION=24.14.0`
 - Start Command (unchanged): `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 
 Render supplies Node/npm in native Python builds and at runtime. Node 22+ must
 remain on PATH: the plugin invokes the generator on demand during extraction.
-No additional service, port, credentials or provider environment variables are
-needed. The upstream plugin may probe its default localhost HTTP provider before
+No additional service or port is needed. Optional cookie authentication is
+documented in the root README. The upstream plugin may probe its default localhost HTTP provider before
 falling back to the configured script; this setup starts no HTTP token server.
 
 The shared yt-dlp options select `mweb` and an absolute `server_home`, so every

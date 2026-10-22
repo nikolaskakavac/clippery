@@ -59,12 +59,12 @@ def test_expiration(manager, monkeypatch):
     assert not directory.exists()
 
 def test_missing_captions(monkeypatch):
-    monkeypatch.setattr(transcript_service, 'extract', lambda _: {'duration':100})
+    monkeypatch.setattr(transcript_service, 'extract', lambda _, **kwargs: {'duration':100})
     with pytest.raises(ServiceError, match='No captions'): transcript_service.provider.get(URL)
 
 def test_manual_captions_preferred(monkeypatch):
     import io, json
-    monkeypatch.setattr(transcript_service, 'extract', lambda _: {
+    monkeypatch.setattr(transcript_service, 'extract', lambda _, **kwargs: {
         'duration':100, 'subtitles':{'pl':[{'ext':'json3','url':'https://www.youtube.com/api/timedtext'}]},
         'automatic_captions':{'en':[{'ext':'json3','url':'https://www.youtube.com/api/timedtext'}]}})
     class FakeYDL:

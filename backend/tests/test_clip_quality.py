@@ -131,7 +131,7 @@ def test_editor_encoding_and_remux(monkeypatch, tmp_path, codec, audio, clip):
 
 
 @pytest.mark.skipif(not shutil.which('ffmpeg') or not shutil.which('ffprobe'), reason='FFmpeg required')
-def test_real_bounded_retry_retains_resolution_and_compatible_codecs(tmp_path, monkeypatch):
+def test_local_precise_cut_avoids_redownload_and_retains_source_quality(tmp_path, monkeypatch):
     monkeypatch.setattr(service, 'check_source_provider', lambda: None)
     source = tmp_path / 'fixture.mp4'
     subprocess.run(['ffmpeg', '-nostdin', '-v', 'error', '-y',
@@ -176,9 +176,12 @@ def test_real_bounded_retry_retains_resolution_and_compatible_codecs(tmp_path, m
 
     monkeypatch.setattr(service, 'YoutubeDL', FixtureYDL)
     real_usable = service.usable_section
-    # Exercise the precise retry even if this FFmpeg version accepts the first cut.
-    monkeypatch.setattr(service, 'usable_section', lambda path, length:
-                        len(attempts) > 1 and real_usable(path, length))
+    # Exercise local precise cutting even if this FFmpeg accepts the first copy.
+    checks = []
+    def check(path, length):
+        checks.append(path)
+        return len(checks) > 1 and real_usable(path, length)
+    monkeypatch.setattr(service, 'usable_section', check)
     output_dir = tmp_path / 'job'
     output_dir.mkdir()
     server = ThreadingHTTPServer(('127.0.0.1', 0), partial(SimpleHTTPRequestHandler, directory=str(tmp_path)))
@@ -190,7 +193,7 @@ def test_real_bounded_retry_retains_resolution_and_compatible_codecs(tmp_path, m
         server.shutdown()
         server.server_close()
         worker.join()
-    assert attempts == [False, True]
+    assert attempts == [False]
     assert len(extractions) == 1
     data = service.probe(output)
     v = next(s for s in data['streams'] if s['codec_type'] == 'video')
@@ -203,3 +206,11 @@ def test_real_bounded_retry_retains_resolution_and_compatible_codecs(tmp_path, m
         assert source_video['avg_frame_rate'] == '60/1'
     assert a['codec_name'] == 'aac'
     assert abs(float(data['format']['duration']) - 2) <= 0.15
+
+    def first_frame(path, seek):
+        return subprocess.run(['ffmpeg', '-v', 'error', '-ss', str(seek), '-i', str(path),
+            '-frames:v', '1', '-pix_fmt', 'rgb24', '-f', 'rawvideo', '-'],
+            check=True, capture_output=True, timeout=30).stdout
+    expected, actual = first_frame(high, .75), first_frame(output, 0)
+    assert len(expected) == len(actual) == 1920 * 1080 * 3
+    assert sum(abs(a - b) for a, b in zip(expected, actual)) / len(actual) < 4

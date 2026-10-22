@@ -14,7 +14,7 @@ def test_shared_provider_configuration():
     assert opts['extractor_args']['youtubepot-bgutilscript']['server_home'] == [str(home)]
     assert opts['js_runtimes'] == {'node': {}}
     assert opts['no_warnings'] is False
-    assert opts['logger'] is video_service.logger
+    assert isinstance(opts['logger'], video_service.DiagnosticLog)
 
 
 def test_extraction_logs_underlying_error_without_exposing_it(monkeypatch, caplog):
@@ -36,6 +36,6 @@ def test_extraction_logs_underlying_error_without_exposing_it(monkeypatch, caplo
     monkeypatch.setattr(video_service, 'YoutubeDL', FailingDownloader)
     with caplog.at_level(logging.ERROR), pytest.raises(video_service.ServiceError) as error:
         video_service.extract('https://youtu.be/dQw4w9WgXcQ')
-    assert underlying in caplog.text
+    assert 'category=bot_detection' in caplog.text
     assert underlying not in str(error.value)
-    assert str(error.value).startswith('YouTube could not provide this video.')
+    assert 'authentication or a bot check' in str(error.value)

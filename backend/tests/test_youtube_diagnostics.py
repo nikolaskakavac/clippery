@@ -13,7 +13,8 @@ def test_diagnostics_opt_in(monkeypatch):
     assert diagnostic['extractor_args'] == normal['extractor_args']
 
 
-def test_provider_diagnostics(caplog):
+def test_provider_diagnostics(caplog, monkeypatch):
+    monkeypatch.setenv("YTDLP_DIAGNOSTICS", "1")
     with caplog.at_level(logging.WARNING):
         log = DiagnosticLog()
         log.debug('[debug] Proxy map: secret-proxy')
@@ -22,11 +23,11 @@ def test_provider_diagnostics(caplog):
         log.debug('[debug] [youtube] [pot:bgutil:script-node] Executing command to get POT via script: node --context private-visitor')
         log.warning('provider warning')
         log.error('provider error')
-    assert 'bgutil available' in caplog.text
+    assert 'Token provider activity' in caplog.text
     assert 'secret-proxy' not in caplog.text
     assert 'token=private' not in caplog.text
-    assert 'provider warning' in caplog.text
-    assert 'provider error' in caplog.text
+    assert 'YouTube upstream warning' in caplog.text
+    assert 'YouTube upstream error' in caplog.text
 
     assert 'private-config' not in caplog.text
     assert 'private-visitor' not in caplog.text

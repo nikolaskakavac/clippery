@@ -18,7 +18,7 @@ def validate_clip(start: float, end: float, duration: float) -> None:
     if not all(math.isfinite(v) for v in (start, end, duration)):
         raise ValueError('Timestamps must be finite.')
     if duration > MAX_SOURCE_SECONDS:
-        raise ValueError('Clip sources must be at most 3 hours.')
+        raise ValueError('Clip sources must be at most 4 hours.')
     if start < 0 or end <= start or end > duration:
         raise ValueError('Clip must start at or after zero and end after start, within the video.')
     if end - start > MAX_CLIP_SECONDS:

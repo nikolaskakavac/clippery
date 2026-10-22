@@ -41,7 +41,7 @@ export default function Home() {
   const generation = useRef(0); const captionController = useRef<AbortController | null>(null);
   const processing = batchBusy || submitting || !!(job && !['Ready', 'Failed'].includes(job.state));
   const startSeconds = parseTime(start), endSeconds = parseTime(end), length = endSeconds - startSeconds;
-  const clipError = !Number.isFinite(length) ? 'Enter timestamps as HH:MM:SS.' : startSeconds < 0 || length <= 0 ? 'OUT must be after IN.' : video && endSeconds > video.duration ? 'OUT must be within the source.' : length > 300 ? 'Clips can be at most 5 minutes.' : video && video.duration > 10800 ? 'Clip sources can be at most 3 hours.' : '';
+  const clipError = !Number.isFinite(length) ? 'Enter timestamps as HH:MM:SS.' : startSeconds < 0 || length <= 0 ? 'OUT must be after IN.' : video && endSeconds > video.duration ? 'OUT must be within the source.' : length > 300 ? 'Clips can be at most 5 minutes.' : video && video.duration > 14400 ? 'Clip sources can be at most 4 hours.' : '';
   const matches = useMemo(() => transcript?.segments.map((s, index) => ({ ...s, index })).filter(s => s.text.toLowerCase().includes(deferredQuery.toLowerCase())) || [], [transcript, deferredQuery]);
   const totalPages = Math.max(1, Math.ceil(matches.length / 80)); const currentPage = Math.min(page, totalPages - 1);
   useEffect(() => {

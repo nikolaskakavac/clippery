@@ -1,4 +1,7 @@
 import asyncio
+import os
+import logging
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -12,6 +15,10 @@ from app.services.video_service import ServiceError
 
 @asynccontextmanager
 async def lifespan(app):
+    if os.getenv('YTDLP_DIAGNOSTICS', '').lower() in {'1', 'true'}:
+        from app.diagnostics import runtime_report
+        report = await asyncio.to_thread(runtime_report)
+        logging.getLogger('uvicorn.error').info('YouTube runtime diagnostics: %s', json.dumps(report))
     async def sweep():
         while True:
             manager.cleanup()

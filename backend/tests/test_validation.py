@@ -40,9 +40,9 @@ def test_bad_timestamps(value):
 
 def test_format_time(): assert format_time(4462.7) == '01:14:22'
 
-@pytest.mark.parametrize('start,end,duration', [(0,300,10800), (100,101,101), (1.25,3.5,10)])
+@pytest.mark.parametrize('start,end,duration', [(0,300,10800), (10800,11100,14400), (14100,14400,14400), (100,101,101), (1.25,3.5,10)])
 def test_clip_boundaries(start,end,duration): validate_clip(start,end,duration)
 
-@pytest.mark.parametrize('start,end,duration', [(-1,10,100), (10,10,100), (20,10,100), (0,301,1000), (0,10,10801), (0,101,100), (math.nan,10,100), (0,math.inf,100)])
+@pytest.mark.parametrize('start,end,duration', [(-1,10,100), (10,10,100), (20,10,100), (0,301,1000), (0,10,14401), (0,101,100), (math.nan,10,100), (0,math.inf,100)])
 def test_invalid_clips(start,end,duration):
     with pytest.raises(ValueError): validate_clip(start,end,duration)

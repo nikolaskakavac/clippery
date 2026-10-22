@@ -1,13 +1,19 @@
 import json
+from urllib.error import URLError
+from yt_dlp.utils import DownloadError
+from yt_dlp.networking.exceptions import RequestError
 from urllib.parse import urlsplit
 from yt_dlp import YoutubeDL
-from app.services.video_service import extract, options, ServiceError
+from app.services.video_service import extract, ServiceError, run_youtube
 from app.utils.time import format_time
 
 class CaptionProvider:
     """Replace or compose this provider with speech-to-text in a later version."""
     def get(self, url: str) -> dict:
-        info = extract(url)
+        return run_youtube(lambda opts: self._get(url, opts))
+
+    def _get(self, url, session_options):
+        info = extract(url, session_options=session_options)
         selected = None
         for automatic, tracks in [(False, info.get('subtitles', {})), (True, info.get('automatic_captions', {}))]:
             languages = sorted(tracks, key=lambda lang: (not lang.startswith('en'), lang))
@@ -25,13 +31,15 @@ class CaptionProvider:
         if not (host == 'youtube.com' or host.endswith('.youtube.com')):
             raise ServiceError('The caption source is unsupported.')
         try:
-            with YoutubeDL(options()) as ydl:
+            with YoutubeDL(session_options) as ydl:
                 with ydl.urlopen(track['url']) as response:
                     raw = response.read(10_000_001)
             if len(raw) > 10_000_000:
                 raise ServiceError('This caption file is too large.')
             data = json.loads(raw)
         except ServiceError:
+            raise
+        except (DownloadError, RequestError, URLError, TimeoutError, ConnectionError):
             raise
         except Exception:
             raise ServiceError('Captions could not be loaded. Please try again later.') from None
